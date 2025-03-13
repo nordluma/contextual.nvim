@@ -5,6 +5,8 @@ use tokio::io::{
 
 use crate::jsonrpc::JsonRpcServer;
 
+pub mod tcp;
+
 // TODO: change this to a more sophisticated way to handle errors
 type GenError = Box<dyn std::error::Error>;
 
