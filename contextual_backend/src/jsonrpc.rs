@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -26,21 +29,23 @@ struct ResponseError {
 }
 
 pub struct JsonRpcServer {
-    handlers: HashMap<String, Box<dyn Fn(Value) -> Result<Value, String>>>,
+    handlers:
+        Arc<RwLock<HashMap<String, Box<dyn Fn(Value) -> Result<Value, String> + Send + Sync>>>>,
 }
 
 impl JsonRpcServer {
     pub fn new() -> Self {
         JsonRpcServer {
-            handlers: HashMap::new(),
+            handlers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    pub fn register_method<F>(&mut self, method: &str, handler: F)
+    pub fn register_method<F>(&mut self, method: String, handler: F)
     where
-        F: Fn(Value) -> Result<Value, String> + 'static,
+        F: Fn(Value) -> Result<Value, String> + Send + Sync + 'static,
     {
-        self.handlers.insert(method.to_string(), Box::new(handler));
+        let mut handlers = self.handlers.write().unwrap();
+        handlers.insert(method, Box::new(handler));
     }
 
     pub fn handle_request(&self, request_text: &str) -> String {
@@ -49,7 +54,8 @@ impl JsonRpcServer {
             Err(e) => return self.create_error_response(0, -32700, &format!("Parse error: {e}")),
         };
 
-        match self.handlers.get(&request.method) {
+        let handlers = self.handlers.read().unwrap();
+        match handlers.get(&request.method) {
             Some(handler) => match handler(request.params) {
                 Ok(res) => {
                     let response = Response {
@@ -64,6 +70,12 @@ impl JsonRpcServer {
                 Err(e) => self.create_error_response(request.id, -32603, &e),
             },
             None => self.create_error_response(request.id, -32601, "Method not found"),
+        }
+    }
+
+    pub fn clone(&self) -> Self {
+        Self {
+            handlers: Arc::clone(&self.handlers),
         }
     }
 
