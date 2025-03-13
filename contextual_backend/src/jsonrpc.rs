@@ -7,25 +7,26 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
-struct Request {
-    jsonrpc: String,
-    id: u64,
-    method: String,
-    params: Value,
+pub struct Request {
+    #[allow(unused)]
+    pub jsonrpc: String,
+    pub id: u64,
+    pub method: String,
+    pub params: Value,
 }
 
 #[derive(Debug, Serialize)]
-struct Response {
-    jsonrpc: String,
-    id: u64,
-    result: Option<Value>,
-    error: Option<ResponseError>,
+pub struct Response {
+    pub jsonrpc: String,
+    pub id: u64,
+    pub result: Option<Value>,
+    pub error: Option<ResponseError>,
 }
 
 #[derive(Debug, Serialize)]
-struct ResponseError {
-    code: i32,
-    message: String,
+pub struct ResponseError {
+    pub code: i32,
+    pub message: String,
 }
 
 pub struct JsonRpcServer {
