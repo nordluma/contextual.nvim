@@ -35,6 +35,19 @@ pub struct ResponseError {
 pub struct JsonRpcServer {
     handlers: HandlerRegister,
 }
+
+impl Default for JsonRpcServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Clone for JsonRpcServer {
+    fn clone(&self) -> Self {
+        Self {
+            handlers: Arc::clone(&self.handlers),
+        }
+    }
 }
 
 impl JsonRpcServer {
@@ -74,12 +87,6 @@ impl JsonRpcServer {
                 Err(e) => self.create_error_response(request.id, -32603, &e),
             },
             None => self.create_error_response(request.id, -32601, "Method not found"),
-        }
-    }
-
-    pub fn clone(&self) -> Self {
-        Self {
-            handlers: Arc::clone(&self.handlers),
         }
     }
 
