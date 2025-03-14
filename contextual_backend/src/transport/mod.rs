@@ -12,7 +12,10 @@ pub mod unix_socket;
 type GenError = Box<dyn std::error::Error>;
 
 pub trait Transport {
-    async fn start(self, server: JsonRpcServer) -> Result<(), GenError>;
+    fn start(
+        self,
+        server: JsonRpcServer,
+    ) -> impl std::future::Future<Output = Result<(), GenError>> + Send;
 }
 
 /// Read a single JSON-RPC message from reader.
