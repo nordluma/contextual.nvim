@@ -1,6 +1,6 @@
 use tokio::io::{
-    AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, Error as IoError, ErrorKind as IoErrorKind,
-    Result as IoResult,
+    AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Error as IoError,
+    ErrorKind as IoErrorKind, Result as IoResult,
 };
 
 use crate::jsonrpc::JsonRpcServer;
@@ -10,6 +10,12 @@ pub mod unix_socket;
 
 // TODO: change this to a more sophisticated way to handle errors
 type GenError = Box<dyn std::error::Error>;
+
+/// Generic trait for any async read/write capable stream
+pub trait AsyncStream: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
+
+// Implement for any type that satisfies the requirements
+impl<T> AsyncStream for T where T: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 
 pub trait Transport {
     fn start(
