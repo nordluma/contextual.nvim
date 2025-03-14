@@ -6,6 +6,9 @@ use std::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+type HandlerRegister =
+    Arc<RwLock<HashMap<String, Box<dyn Fn(Value) -> Result<Value, String> + Send + Sync>>>>;
+
 #[derive(Debug, Deserialize)]
 pub struct Request {
     #[allow(unused)]
@@ -30,8 +33,8 @@ pub struct ResponseError {
 }
 
 pub struct JsonRpcServer {
-    handlers:
-        Arc<RwLock<HashMap<String, Box<dyn Fn(Value) -> Result<Value, String> + Send + Sync>>>>,
+    handlers: HandlerRegister,
+}
 }
 
 impl JsonRpcServer {
