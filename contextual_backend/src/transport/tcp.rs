@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
-use tokio::{
-    io::BufReader,
-    net::{TcpListener, TcpStream},
+use tokio::net::TcpListener;
+
+use crate::{
+    jsonrpc::JsonRpcServer,
+    transport::{Transport, handle_client},
 };
 
-use crate::{jsonrpc::JsonRpcServer, transport::write_message};
-
-use super::{GenError, Transport, read_message};
+use super::GenError;
 
 pub struct TcpTransport {
     host: String,
@@ -48,25 +48,4 @@ impl Transport for TcpTransport {
             .await?;
         }
     }
-}
-
-async fn handle_client(mut stream: TcpStream, server: Arc<JsonRpcServer>) -> tokio::io::Result<()> {
-    let (read_half, mut write_half) = stream.split();
-    let mut reader = BufReader::new(read_half);
-
-    loop {
-        match read_message(&mut reader).await {
-            Ok(message) => {
-                println!("Received: {message}");
-                let response = server.handle_request(&message);
-                write_message(&mut write_half, &response).await?;
-            }
-            Err(e) => {
-                eprintln!("Error reading message: {e}");
-                break;
-            }
-        }
-    }
-
-    Ok(())
 }

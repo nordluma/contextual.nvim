@@ -1,13 +1,13 @@
 use std::{path::PathBuf, sync::Arc};
 
-use tokio::{
-    io::BufReader,
-    net::{UnixListener, UnixStream},
+use tokio::net::UnixListener;
+
+use crate::{
+    jsonrpc::JsonRpcServer,
+    transport::{Transport, handle_client},
 };
 
-use crate::{jsonrpc::JsonRpcServer, transport::write_message};
-
-use super::{GenError, Transport, read_message};
+use super::GenError;
 
 pub struct UnixTransport {
     socket: PathBuf,
@@ -53,28 +53,4 @@ impl Transport for UnixTransport {
             }
         }
     }
-}
-
-async fn handle_client(
-    mut stream: UnixStream,
-    server: Arc<JsonRpcServer>,
-) -> tokio::io::Result<()> {
-    let (read_half, mut write_half) = stream.split();
-    let mut reader = BufReader::new(read_half);
-
-    loop {
-        match read_message(&mut reader).await {
-            Ok(message) => {
-                println!("Received: {message}");
-                let response = server.handle_request(&message);
-                write_message(&mut write_half, &response).await?;
-            }
-            Err(e) => {
-                eprintln!("Error reading message: {e}");
-                break;
-            }
-        }
-    }
-
-    Ok(())
 }

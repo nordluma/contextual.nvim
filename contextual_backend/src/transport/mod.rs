@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use tokio::io::{
-    AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, Error as IoError,
-    ErrorKind as IoErrorKind, Result as IoResult,
+    AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
+    Error as IoError, ErrorKind as IoErrorKind, Result as IoResult,
 };
 
 use crate::jsonrpc::JsonRpcServer;
@@ -23,6 +25,31 @@ pub trait Transport {
         self,
         server: JsonRpcServer,
     ) -> impl std::future::Future<Output = Result<(), GenError>> + Send;
+}
+
+async fn handle_client<S>(stream: S, server: Arc<JsonRpcServer>) -> tokio::io::Result<()>
+where
+    S: AsyncStream,
+{
+    let (read_half, write_half) = tokio::io::split(stream);
+    let mut reader = BufReader::new(read_half);
+    let mut writer = write_half;
+
+    loop {
+        match read_message(&mut reader).await {
+            Ok(message) => {
+                println!("Received: {message}");
+                let response = server.handle_request(&message);
+                write_message(&mut writer, &response).await?;
+            }
+            Err(e) => {
+                eprintln!("Error reading message: {e}");
+                break;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Read a single JSON-RPC message from reader.

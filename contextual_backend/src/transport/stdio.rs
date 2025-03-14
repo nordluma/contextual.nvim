@@ -1,10 +1,13 @@
 use std::sync::Arc;
 
-use tokio::io::{AsyncRead, AsyncWrite, BufReader};
+use tokio::io::{AsyncRead, AsyncWrite};
 
-use crate::{jsonrpc::JsonRpcServer, transport::write_message};
+use crate::{
+    jsonrpc::JsonRpcServer,
+    transport::{Transport, handle_client},
+};
 
-use super::{AsyncStream, GenError, Transport, read_message};
+use super::GenError;
 
 pub struct StdIoTransport;
 
@@ -18,31 +21,6 @@ impl Transport for StdIoTransport {
 
         Ok(())
     }
-}
-
-async fn handle_client<S>(stream: S, server: Arc<JsonRpcServer>) -> tokio::io::Result<()>
-where
-    S: AsyncStream,
-{
-    let (read_half, write_half) = tokio::io::split(stream);
-    let mut reader = BufReader::new(read_half);
-    let mut writer = write_half;
-
-    loop {
-        match read_message(&mut reader).await {
-            Ok(message) => {
-                println!("Received: {message}");
-                let response = server.handle_request(&message);
-                write_message(&mut writer, &response).await?;
-            }
-            Err(e) => {
-                eprintln!("Error reading message: {e}");
-                break;
-            }
-        }
-    }
-
-    Ok(())
 }
 
 /// Combined stream for stdin/stdout
