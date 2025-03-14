@@ -5,6 +5,7 @@ use tokio::io::{
 
 use crate::jsonrpc::JsonRpcServer;
 
+pub mod stdio;
 pub mod tcp;
 pub mod unix_socket;
 
