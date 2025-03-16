@@ -44,8 +44,7 @@ impl Transport for TcpTransport {
                 if let Err(e) = handle_client(stream, server_clone).await {
                     eprintln!("Connection error: {e}");
                 }
-            })
-            .await?;
+            });
         }
     }
 }
