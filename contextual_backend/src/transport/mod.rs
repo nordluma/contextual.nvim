@@ -21,10 +21,7 @@ pub trait AsyncStream: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 impl<T> AsyncStream for T where T: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 
 pub trait Transport {
-    fn start(
-        self,
-        server: JsonRpcServer,
-    ) -> impl std::future::Future<Output = Result<(), GenError>> + Send;
+    fn start(self, server: JsonRpcServer) -> impl Future<Output = Result<(), GenError>> + Send;
 }
 
 async fn handle_client<S>(stream: S, server: Arc<JsonRpcServer>) -> tokio::io::Result<()>
@@ -39,7 +36,7 @@ where
         match read_message(&mut reader).await {
             Ok(message) => {
                 println!("Received: {message}");
-                let response = server.handle_request(&message);
+                let response = server.handle_request(message).await;
                 write_message(&mut writer, &response).await?;
             }
             Err(e) => {

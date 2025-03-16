@@ -3,11 +3,13 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-type HandlerRegister =
-    Arc<RwLock<HashMap<String, Box<dyn Fn(Value) -> Result<Value, String> + Send + Sync>>>>;
+type AsyncHandler = Box<dyn Fn(Value) -> BoxFuture<'static, Result<Value, String>> + Send + Sync>;
+
+type HandlerRegister = Arc<RwLock<HashMap<String, AsyncHandler>>>;
 
 #[derive(Debug, Deserialize)]
 pub struct Request {
@@ -59,33 +61,43 @@ impl JsonRpcServer {
 
     pub fn register_method<F>(&mut self, method: String, handler: F)
     where
-        F: Fn(Value) -> Result<Value, String> + Send + Sync + 'static,
+        F: Fn(Value) -> BoxFuture<'static, Result<Value, String>> + Send + Sync + 'static,
     {
         let mut handlers = self.handlers.write().unwrap();
         handlers.insert(method, Box::new(handler));
     }
 
-    pub fn handle_request(&self, request_text: &str) -> String {
-        let request: Request = match serde_json::from_str(request_text) {
+    pub async fn handle_request(&self, request_text: String) -> String {
+        let request: Request = match serde_json::from_str(&request_text) {
             Ok(req) => req,
             Err(e) => return self.create_error_response(0, -32700, &format!("Parse error: {e}")),
         };
 
-        let handlers = self.handlers.read().unwrap();
-        match handlers.get(&request.method) {
-            Some(handler) => match handler(request.params) {
-                Ok(res) => {
-                    let response = Response {
-                        jsonrpc: "2.0".to_string(),
-                        id: request.id,
-                        result: Some(res),
-                        error: None,
-                    };
+        let future = {
+            let handlers = self.handlers.read().unwrap();
+            match handlers.get(&request.method) {
+                Some(handler) => Some(handler(request.params)),
+                None => None,
+            }
+        };
 
-                    serde_json::to_string(&response).expect("response json is valid")
+        match future {
+            Some(future) => {
+                let response_res = future.await;
+                match response_res {
+                    Ok(res) => {
+                        let response = Response {
+                            jsonrpc: "2.0".to_string(),
+                            id: request.id,
+                            result: Some(res),
+                            error: None,
+                        };
+
+                        return serde_json::to_string(&response).expect("response json is valid");
+                    }
+                    Err(e) => return self.create_error_response(request.id, -32603, &e),
                 }
-                Err(e) => self.create_error_response(request.id, -32603, &e),
-            },
+            }
             None => self.create_error_response(request.id, -32601, "Method not found"),
         }
     }
