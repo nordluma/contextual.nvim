@@ -1,15 +1,30 @@
+use std::sync::Arc;
+
 use contextual_backend::{
     args::{Args, TransportType},
+    database::file::FileDatabase,
+    handlers::Handler,
     jsonrpc::JsonRpcServer,
     transport::{Transport, stdio::StdIoTransport, tcp::TcpTransport, unix_socket::UnixTransport},
 };
+use futures::future::BoxFuture;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse_and_validate();
 
-    // TODO: define handlers and register them to the jsonrpc server
-    let server = JsonRpcServer::new();
+    let db = FileDatabase::init();
+    let handler = Arc::new(Handler::new(db));
+    let mut server = JsonRpcServer::new();
+    server.register_method(
+        "contextual/saveNote".to_string(),
+        Box::new(
+            move |params| -> BoxFuture<'static, Result<serde_json::Value, String>> {
+                let handler = Arc::clone(&handler);
+                Box::pin(async move { handler.save_note(params).await })
+            },
+        ),
+    );
 
     match args.transport {
         TransportType::Unix { socket_path } => UnixTransport::new(socket_path).start(server).await,
