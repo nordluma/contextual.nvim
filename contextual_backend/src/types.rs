@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue};
+use uuid::Uuid;
 
 type GenError = Box<dyn std::error::Error>;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct NoteContext {
     pub filename: String,
     pub project_dir: String,
@@ -34,6 +36,25 @@ impl TryFrom<JsonMap<String, JsonValue>> for NoteContext {
             project_dir,
             selection,
         })
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Note {
+    pub id: Uuid,
+    pub context: NoteContext,
+    pub content: String,
+}
+
+impl Note {
+    pub fn new(new_note: NewNote) -> Self {
+        let id = Uuid::new_v4();
+
+        Self {
+            id,
+            context: new_note.context,
+            content: new_note.content,
+        }
     }
 }
 
