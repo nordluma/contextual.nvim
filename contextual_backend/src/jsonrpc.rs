@@ -93,9 +93,9 @@ impl JsonRpcServer {
                             error: None,
                         };
 
-                        return serde_json::to_string(&response).expect("response json is valid");
+                        serde_json::to_string(&response).expect("response json is valid")
                     }
-                    Err(e) => return self.create_error_response(request.id, -32603, &e),
+                    Err(e) => self.create_error_response(request.id, -32603, &e),
                 }
             }
             None => self.create_error_response(request.id, -32601, "Method not found"),

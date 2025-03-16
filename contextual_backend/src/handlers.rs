@@ -15,7 +15,7 @@ impl<DB: Store> Handler<DB> {
         let new_note = params.try_into()?;
         match self.database.save_note(new_note).await {
             Ok(note_id) => Ok(json!({"id": note_id})),
-            Err(e) => Err(format!("Database error: {e:?}").into()),
+            Err(e) => Err(format!("Database error: {e:?}")),
         }
     }
 }

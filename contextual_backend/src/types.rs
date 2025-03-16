@@ -2,8 +2,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use uuid::Uuid;
 
-type GenError = Box<dyn std::error::Error>;
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct NoteContext {
     pub filename: String,

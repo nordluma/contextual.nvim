@@ -1,4 +1,5 @@
 pub mod args;
+pub mod database;
 pub mod handlers;
 pub mod jsonrpc;
 pub mod transport;
