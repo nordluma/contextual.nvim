@@ -10,7 +10,7 @@ pub struct NoteContext {
 }
 
 impl TryFrom<JsonMap<String, JsonValue>> for NoteContext {
-    type Error = GenError;
+    type Error = String;
 
     fn try_from(value: JsonMap<String, JsonValue>) -> Result<Self, Self::Error> {
         let filename = value
@@ -44,7 +44,7 @@ pub struct NewNote {
 }
 
 impl TryFrom<JsonValue> for NewNote {
-    type Error = GenError;
+    type Error = String;
 
     fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
         let context = value
