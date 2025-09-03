@@ -7,12 +7,10 @@ use crate::{
     transport::{Transport, handle_client},
 };
 
-use super::GenError;
-
 pub struct StdIoTransport;
 
 impl Transport for StdIoTransport {
-    async fn start(self, server: JsonRpcServer) -> Result<(), GenError> {
+    async fn start(self, server: JsonRpcServer) -> Result<(), anyhow::Error> {
         println!("Server listening on stdin/stdout");
         let server = Arc::new(server);
         let stream = CombinedStream::new(tokio::io::stdin(), tokio::io::stdout());

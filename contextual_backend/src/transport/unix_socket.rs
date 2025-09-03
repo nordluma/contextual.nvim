@@ -7,8 +7,6 @@ use crate::{
     transport::{Transport, handle_client},
 };
 
-use super::GenError;
-
 pub struct UnixTransport {
     socket: PathBuf,
 }
@@ -28,7 +26,7 @@ impl std::fmt::Display for UnixTransport {
 }
 
 impl Transport for UnixTransport {
-    async fn start(self, server: JsonRpcServer) -> Result<(), GenError> {
+    async fn start(self, server: JsonRpcServer) -> Result<(), anyhow::Error> {
         if self.socket.exists() {
             std::fs::remove_file(&self.socket)?;
         }

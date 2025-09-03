@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Display,
     sync::{Arc, RwLock},
 };
 
@@ -7,7 +8,8 @@ use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-type AsyncHandler = Box<dyn Fn(Value) -> BoxFuture<'static, Result<Value, String>> + Send + Sync>;
+type AsyncHandler =
+    Box<dyn Fn(Value) -> BoxFuture<'static, Result<Value, anyhow::Error>> + Send + Sync>;
 
 type HandlerRegister = Arc<RwLock<HashMap<String, AsyncHandler>>>;
 
@@ -61,7 +63,7 @@ impl JsonRpcServer {
 
     pub fn register_method<F>(&mut self, method: String, handler: F)
     where
-        F: Fn(Value) -> BoxFuture<'static, Result<Value, String>> + Send + Sync + 'static,
+        F: Fn(Value) -> BoxFuture<'static, Result<Value, anyhow::Error>> + Send + Sync + 'static,
     {
         let mut handlers = self.handlers.write().unwrap();
         handlers.insert(method, Box::new(handler));
@@ -95,14 +97,14 @@ impl JsonRpcServer {
 
                         serde_json::to_string(&response).expect("response json is valid")
                     }
-                    Err(e) => self.create_error_response(request.id, -32603, &e),
+                    Err(e) => self.create_error_response(request.id, -32603, e),
                 }
             }
             None => self.create_error_response(request.id, -32601, "Method not found"),
         }
     }
 
-    fn create_error_response(&self, id: u64, code: i32, message: &str) -> String {
+    fn create_error_response<E: Display>(&self, id: u64, code: i32, message: E) -> String {
         let response = Response {
             jsonrpc: "2.0".to_string(),
             id,

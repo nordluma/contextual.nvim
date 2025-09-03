@@ -11,11 +11,11 @@ impl<DB: Store> Handler<DB> {
         Self { database }
     }
 
-    pub async fn save_note(&self, params: Value) -> Result<Value, String> {
+    pub async fn save_note(&self, params: Value) -> Result<Value, anyhow::Error> {
         let new_note = params.try_into()?;
-        match self.database.save_note(new_note).await {
-            Ok(note_id) => Ok(json!({"id": note_id})),
-            Err(e) => Err(format!("Database error: {e:?}")),
-        }
+        let note_id = self.database.save_note(new_note).await?;
+
+        Ok(json!({"id": note_id}))
+    }
     }
 }

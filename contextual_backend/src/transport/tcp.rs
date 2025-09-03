@@ -7,8 +7,6 @@ use crate::{
     transport::{Transport, handle_client},
 };
 
-use super::GenError;
-
 pub struct TcpTransport {
     host: String,
     port: u16,
@@ -30,7 +28,7 @@ impl TcpTransport {
 }
 
 impl Transport for TcpTransport {
-    async fn start(self, server: JsonRpcServer) -> Result<(), GenError> {
+    async fn start(self, server: JsonRpcServer) -> Result<(), anyhow::Error> {
         let listener = TcpListener::bind(format!("{self}")).await?;
         println!("Server listening on {self}");
         let server = Arc::new(server);

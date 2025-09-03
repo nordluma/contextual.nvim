@@ -10,7 +10,7 @@ use contextual_backend::{
 use futures::future::BoxFuture;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse_and_validate();
 
     let db = FileDatabase::init();
@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     server.register_method(
         "contextual/saveNote".to_string(),
         Box::new(
-            move |params| -> BoxFuture<'static, Result<serde_json::Value, String>> {
+            move |params| -> BoxFuture<'static, Result<serde_json::Value, anyhow::Error>> {
                 let handler = Arc::clone(&handler);
                 Box::pin(async move { handler.save_note(params).await })
             },

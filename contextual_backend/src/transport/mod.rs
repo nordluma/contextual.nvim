@@ -11,9 +11,6 @@ pub mod stdio;
 pub mod tcp;
 pub mod unix_socket;
 
-// TODO: change this to a more sophisticated way to handle errors
-type GenError = Box<dyn std::error::Error>;
-
 /// Generic trait for any async read/write capable stream
 pub trait AsyncStream: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 
@@ -21,7 +18,8 @@ pub trait AsyncStream: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 impl<T> AsyncStream for T where T: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 
 pub trait Transport {
-    fn start(self, server: JsonRpcServer) -> impl Future<Output = Result<(), GenError>> + Send;
+    fn start(self, server: JsonRpcServer)
+    -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
 async fn handle_client<S>(stream: S, server: Arc<JsonRpcServer>) -> tokio::io::Result<()>
