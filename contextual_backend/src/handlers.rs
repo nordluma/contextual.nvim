@@ -17,5 +17,10 @@ impl<DB: Store> Handler<DB> {
 
         Ok(json!({"id": note_id}))
     }
+
+    pub async fn save_todo_item(&self, params: Value) -> Result<Value, anyhow::Error> {
+        let new_todo_item = params.try_into()?;
+
+        todo!()
     }
 }
