@@ -1,3 +1,4 @@
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use uuid::Uuid;
@@ -10,23 +11,25 @@ pub struct NoteContext {
 }
 
 impl TryFrom<JsonMap<String, JsonValue>> for NoteContext {
-    type Error = String;
+    type Error = anyhow::Error;
 
     fn try_from(value: JsonMap<String, JsonValue>) -> Result<Self, Self::Error> {
         let filename = value
             .get("filename")
             .and_then(|f| f.as_str())
-            .ok_or("Filename required")?
+            .context("Filename required")?
             .to_owned();
+
         let project_dir = value
             .get("project_dir")
             .and_then(|f| f.as_str())
-            .ok_or("Project directory required")?
+            .context("Project directory required")?
             .to_owned();
+
         let selection = value
             .get("selection")
             .and_then(|s| s.as_str())
-            .ok_or("Selection required")?
+            .context("Selection required")?
             .to_owned();
 
         Ok(Self {
@@ -63,19 +66,20 @@ pub struct NewNote {
 }
 
 impl TryFrom<JsonValue> for NewNote {
-    type Error = String;
+    type Error = anyhow::Error;
 
     fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
         let context = value
             .get("context")
-            .and_then(|ctx| ctx.as_object().cloned())
-            .ok_or("Invalid context")?
+            .and_then(|ctx| ctx.as_object())
+            .cloned()
+            .context("Invalid context")?
             .try_into()?;
 
         let content = value
             .get("content")
             .and_then(|c| c.as_str())
-            .ok_or("content is required")?
+            .context("content is required")?
             .to_owned();
 
         Ok(Self { context, content })
