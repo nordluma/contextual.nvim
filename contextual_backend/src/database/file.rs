@@ -1,8 +1,13 @@
 use std::{env::current_dir, path::PathBuf};
 
+use anyhow::Context;
+use serde::Serialize;
 use uuid::Uuid;
 
-use crate::types::{NewNote, Note};
+use crate::types::{
+    NewNote, Note,
+    todo::{NewTodoItem, TodoItem},
+};
 
 use super::Store;
 
@@ -20,22 +25,16 @@ impl FileDatabase {
 
 impl Store for FileDatabase {
     async fn save_note(&self, new_note: NewNote) -> Result<Uuid, anyhow::Error> {
-        let note = Note::new(new_note);
-
-        if !std::fs::exists(&self.dir)? {
-            std::fs::create_dir_all(&self.dir)?;
+        if !tokio::fs::try_exists(&self.dir).await? {
+            tokio::fs::create_dir_all(&self.dir).await?;
         }
 
+        let note = Note::new(new_note);
         let note_file = self.dir.join(note.id.to_string());
-        let f = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(note_file)?;
+        let note_id = note.id;
+        write_file(note_file, note).await?;
 
-        serde_json::to_writer(f, &note)?;
-
-        Ok(note.id)
+        Ok(note_id)
     }
 
     async fn get_note(&self, note_id: Uuid) -> Result<Note, anyhow::Error> {
@@ -50,17 +49,42 @@ impl Store for FileDatabase {
         todo!()
     }
 
-    async fn update_note(&self, note_id: u64, updated_note: String) -> Result<(), anyhow::Error> {
+    async fn update_note(&self, _note_id: u64, _updated_note: String) -> Result<(), anyhow::Error> {
         todo!()
     }
 
-    async fn delete_note(&self, note_id: u64) -> Result<(), anyhow::Error> {
+    async fn delete_note(&self, _note_id: u64) -> Result<(), anyhow::Error> {
         todo!()
     }
 
-    async fn save_todo(&self) -> Result<Uuid, anyhow::Error> {
-        todo!()
+    async fn save_todo(&self, new_todo: NewTodoItem) -> Result<Uuid, anyhow::Error> {
+        if !tokio::fs::try_exists(&self.dir).await? {
+            tokio::fs::create_dir_all(&self.dir).await?;
+        }
+
+        let todo_item = TodoItem::new(new_todo);
+        let todo_file = self.dir.join(todo_item.id.to_string());
+        let todo_id = todo_item.id;
+        write_file(todo_file, todo_item).await?;
+
+        Ok(todo_id)
     }
+}
+
+async fn write_file<S: Serialize + Send + 'static>(
+    path: PathBuf,
+    content: S,
+) -> Result<(), anyhow::Error> {
+    tokio::task::spawn_blocking(move || {
+        std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)
+            .context("failed to open file for writing")
+            .and_then(|f| serde_json::to_writer(f, &content).context("failed to write to file"))
+    })
+    .await?
 }
 
 #[cfg(test)]

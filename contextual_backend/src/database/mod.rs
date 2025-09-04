@@ -1,6 +1,6 @@
 use uuid::Uuid;
 
-use crate::types::{NewNote, Note};
+use crate::types::{NewNote, Note, todo::NewTodoItem};
 
 pub mod file;
 
@@ -15,5 +15,6 @@ pub trait Store: Sized {
     ) -> impl Future<Output = Result<(), anyhow::Error>>;
     fn delete_note(&self, note_id: u64) -> impl Future<Output = Result<(), anyhow::Error>>;
 
-    fn save_todo(&self) -> impl Future<Output = Result<Uuid, anyhow::Error>>;
+    fn save_todo(&self, new_todo: NewTodoItem)
+    -> impl Future<Output = Result<Uuid, anyhow::Error>>;
 }

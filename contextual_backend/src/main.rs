@@ -16,12 +16,24 @@ async fn main() -> Result<(), anyhow::Error> {
     let db = FileDatabase::init();
     let handler = Arc::new(Handler::new(db));
     let mut server = JsonRpcServer::new();
+    let handler_clone = Arc::clone(&handler);
     server.register_method(
         "contextual/saveNote".to_string(),
         Box::new(
             move |params| -> BoxFuture<'static, Result<serde_json::Value, anyhow::Error>> {
-                let handler = Arc::clone(&handler);
+                let handler = Arc::clone(&handler_clone);
                 Box::pin(async move { handler.save_note(params).await })
+            },
+        ),
+    );
+
+    let handler_clone = Arc::clone(&handler);
+    server.register_method(
+        "contextual/newTodo".to_string(),
+        Box::new(
+            move |params| -> BoxFuture<'static, Result<serde_json::Value, anyhow::Error>> {
+                let handler = Arc::clone(&handler_clone);
+                Box::pin(async move { handler.save_todo_item(params).await })
             },
         ),
     );

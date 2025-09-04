@@ -1,5 +1,6 @@
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
@@ -48,7 +49,7 @@ impl TryFrom<JsonValue> for NewTodoItem {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TodoItem {
     pub id: Uuid,
     pub hash: String,

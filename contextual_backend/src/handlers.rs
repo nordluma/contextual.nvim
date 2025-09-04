@@ -19,8 +19,9 @@ impl<DB: Store> Handler<DB> {
     }
 
     pub async fn save_todo_item(&self, params: Value) -> Result<Value, anyhow::Error> {
-        let new_todo_item = params.try_into()?;
+        let new_todo = params.try_into()?;
+        let todo_id = self.database.save_todo(new_todo).await?;
 
-        todo!()
+        Ok(json!({"id": todo_id}))
     }
 }
