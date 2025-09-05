@@ -1,3 +1,5 @@
+local jsonrpc = require("contextual.jsonrpc")
+
 local M = {}
 
 M.setup = function(opts)
@@ -83,6 +85,54 @@ local sync_scan_todos = function()
 	end
 end
 
+local send_tcp = function(client, payload)
+	local payload_body = vim.json.encode(payload)
+	local payload_len = string.len(payload_body)
+	local json_payload = string.format("Content-Length: %d\r\n\r\n", payload_len)
+	vim.uv.write(client, json_payload, function(err)
+		if err then
+			vim.notify("error sending message header: " .. err, vim.log.levels.WARN)
+		end
+	end)
+
+	vim.uv.write(client, payload_body, function(err)
+		if err then
+			vim.notify("error sending message content: " .. err, vim.log.levels.WARN)
+		end
+	end)
+end
+
+local connect_to_backend = function(req, opts)
+	local addr = opts.addr or "127.0.0.1"
+	local port = opts.port or 8080
+	local client = vim.uv.new_tcp()
+	if not client then
+		return nil
+	end
+
+	vim.uv.tcp_connect(client, addr, port, function(err)
+		if err then
+			vim.notify("error connecting to contextual backend: " .. err, vim.log.levels.WARN)
+		end
+
+		send_tcp(client, req)
+
+		vim.uv.read_start(client, function(err, data)
+			-- vim.print("received: ", err, data)
+			if err then
+				vim.notify("error reading response: " .. err, vim.log.levels.WARN)
+			elseif data then
+				vim.print(data)
+				vim.uv.shutdown(client)
+			else
+				vim.uv.close(client)
+			end
+		end)
+	end)
+
+	return client
+end
+
 M.new_note = function(opts)
 	local note_ctx = capture_note_ctx(opts)
 	print(note_ctx)
@@ -90,7 +140,12 @@ end
 
 M.sync_todos = function(opts)
 	local result = sync_scan_todos()
-	vim.print(result)
+	local req = jsonrpc.NewJsonRpcRequest(5, "contextual/newTodo", result)
+	local client = connect_to_backend(req, {})
+	if not client then
+		vim.notify("failed to create tcp client", vim.log.levels.WARN)
+		return
+	end
 end
 
 return M
