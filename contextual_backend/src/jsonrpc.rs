@@ -8,9 +8,8 @@ use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-type AsyncHandler =
-    Box<dyn Fn(Value) -> BoxFuture<'static, Result<Value, anyhow::Error>> + Send + Sync>;
-
+pub type HandlerFut = BoxFuture<'static, Result<Value, anyhow::Error>>;
+type AsyncHandler = Box<dyn Fn(Value) -> HandlerFut + Send + Sync>;
 type HandlerRegister = Arc<RwLock<HashMap<String, AsyncHandler>>>;
 
 #[derive(Debug, Deserialize)]
@@ -61,12 +60,13 @@ impl JsonRpcServer {
         }
     }
 
-    pub fn register_method<F>(&mut self, method: String, handler: F)
+    pub fn register_method<M, F>(&mut self, method: M, handler: F)
     where
-        F: Fn(Value) -> BoxFuture<'static, Result<Value, anyhow::Error>> + Send + Sync + 'static,
+        M: Into<String>,
+        F: Fn(Value) -> HandlerFut + Send + Sync + 'static,
     {
         let mut handlers = self.handlers.write().unwrap();
-        handlers.insert(method, Box::new(handler));
+        handlers.insert(method.into(), Box::new(handler));
     }
 
     pub async fn handle_request(&self, request_text: String) -> String {

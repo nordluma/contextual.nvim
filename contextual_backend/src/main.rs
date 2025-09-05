@@ -4,10 +4,9 @@ use contextual_backend::{
     args::{Args, TransportType},
     database::file::FileDatabase,
     handlers::Handler,
-    jsonrpc::JsonRpcServer,
+    jsonrpc::{HandlerFut, JsonRpcServer},
     transport::{Transport, stdio::StdIoTransport, tcp::TcpTransport, unix_socket::UnixTransport},
 };
-use futures::future::BoxFuture;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -18,24 +17,20 @@ async fn main() -> Result<(), anyhow::Error> {
     let mut server = JsonRpcServer::new();
     let handler_clone = Arc::clone(&handler);
     server.register_method(
-        "contextual/saveNote".to_string(),
-        Box::new(
-            move |params| -> BoxFuture<'static, Result<serde_json::Value, anyhow::Error>> {
-                let handler = Arc::clone(&handler_clone);
-                Box::pin(async move { handler.save_note(params).await })
-            },
-        ),
+        "contextual/saveNote",
+        Box::new(move |params| -> HandlerFut {
+            let handler = Arc::clone(&handler_clone);
+            Box::pin(async move { handler.save_note(params).await })
+        }),
     );
 
     let handler_clone = Arc::clone(&handler);
     server.register_method(
-        "contextual/newTodo".to_string(),
-        Box::new(
-            move |params| -> BoxFuture<'static, Result<serde_json::Value, anyhow::Error>> {
-                let handler = Arc::clone(&handler_clone);
-                Box::pin(async move { handler.save_todo_item(params).await })
-            },
-        ),
+        "contextual/newTodo",
+        Box::new(move |params| -> HandlerFut {
+            let handler = Arc::clone(&handler_clone);
+            Box::pin(async move { handler.save_todo_item(params).await })
+        }),
     );
 
     match args.transport {
