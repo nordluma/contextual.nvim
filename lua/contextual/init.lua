@@ -85,11 +85,14 @@ local sync_scan_todos = function()
 	end
 end
 
-local send_tcp = function(client, payload)
-	local payload_body = vim.json.encode(payload)
-	local payload_len = string.len(payload_body)
-	local json_payload = string.format("Content-Length: %d\r\n\r\n", payload_len)
-	vim.uv.write(client, json_payload, function(err)
+local write_request_header = function(request)
+	return string.format("Content-Length: %d\r\n\r\n", string.len(request))
+end
+
+local send_tcp = function(client, request)
+	local payload_body = vim.json.encode(request)
+	local request_header = write_request_header(payload_body)
+	vim.uv.write(client, request_header, function(err)
 		if err then
 			vim.notify("error sending message header: " .. err, vim.log.levels.WARN)
 		end
