@@ -46,9 +46,10 @@ local parse_header = function(response)
 	return content_length, body
 end
 
+---@param body string
 ---@return JsonRpcResponse|nil
-M.ParseJsonRpcResponse = function(response_payload)
-	return vim.json.decode(response_payload)
+M.ParseJsonRpcResponse = function(body)
+	return vim.json.decode(body)
 end
 
 return M
