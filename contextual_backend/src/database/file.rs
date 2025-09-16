@@ -1,4 +1,4 @@
-use std::{env::current_dir, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use serde::Serialize;
@@ -16,8 +16,20 @@ pub struct FileDatabase {
 }
 
 impl FileDatabase {
-    pub fn init() -> Self {
-        let dir = current_dir().unwrap();
+    pub async fn init() -> Self {
+        // TODO: error handling
+        let dir = dirs::data_dir()
+            .expect("unable to determine 'data' directory")
+            .join("contextual");
+
+        if !tokio::fs::try_exists(&dir)
+            .await
+            .expect("could not check for existing directory")
+        {
+            tokio::fs::create_dir_all(&dir)
+                .await
+                .expect("failed to create directory for file based storage");
+        }
 
         Self { dir }
     }
@@ -104,7 +116,7 @@ mod tests {
             },
             content: "A new test note".to_string(),
         };
-        let file_db = FileDatabase::init();
+        let file_db = FileDatabase::init().await;
         println!("saving files to: {}", file_db.dir.display());
         let id = file_db.save_note(new_note).await.unwrap();
 
