@@ -32,6 +32,15 @@ async fn main() -> Result<(), anyhow::Error> {
         }),
     );
 
+    let handler_clone = Arc::clone(&handler);
+    server.register_method(
+        "contextual/syncTodos",
+        Box::new(move |params| -> HandlerFut {
+            let handler = Arc::clone(&handler_clone);
+            Box::pin(async move { handler.sync_todos(params).await })
+        }),
+    );
+
     match args.transport {
         TransportType::Unix { socket_path } => UnixTransport::new(socket_path).start(server).await,
         TransportType::Tcp { host, port } => TcpTransport::new(&host, port).start(server).await,
