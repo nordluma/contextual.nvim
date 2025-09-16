@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
+pub struct NewTodoItems(Vec<NewTodoItems>);
+
 #[derive(Debug)]
 pub struct NewTodoItem {
     pub branch: String,
@@ -46,6 +48,23 @@ impl TryFrom<JsonValue> for NewTodoItem {
             line_number,
             content,
         })
+    }
+}
+
+impl TryFrom<JsonValue> for NewTodoItems {
+    type Error = anyhow::Error;
+
+    fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
+        let items = value
+            .as_array()
+            .context("params is expected to be an array")?;
+
+        let todo_items = items
+            .into_iter()
+            .flat_map(|i| i.to_owned().try_into())
+            .collect();
+
+        Ok(NewTodoItems(todo_items))
     }
 }
 
