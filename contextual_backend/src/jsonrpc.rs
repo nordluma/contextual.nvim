@@ -13,7 +13,7 @@ type AsyncHandler = Box<dyn Fn(Value) -> HandlerFut + Send + Sync>;
 type HandlerRegister = Arc<RwLock<HashMap<String, AsyncHandler>>>;
 
 #[derive(Debug, Deserialize)]
-pub struct Request {
+pub struct JsonRpcRequest {
     #[allow(unused)]
     pub jsonrpc: String,
     pub id: u64,
@@ -22,7 +22,7 @@ pub struct Request {
 }
 
 #[derive(Debug, Serialize)]
-pub struct Response {
+pub struct JsonRpcResponse {
     pub jsonrpc: String,
     pub id: u64,
     pub result: Option<Value>,
@@ -70,7 +70,7 @@ impl JsonRpcServer {
     }
 
     pub async fn handle_request(&self, request_text: String) -> String {
-        let request: Request = match serde_json::from_str(&request_text) {
+        let request: JsonRpcRequest = match serde_json::from_str(&request_text) {
             Ok(req) => req,
             Err(e) => return self.create_error_response(0, -32700, &format!("Parse error: {e}")),
         };
@@ -88,7 +88,7 @@ impl JsonRpcServer {
                 let response_res = future.await;
                 match response_res {
                     Ok(res) => {
-                        let response = Response {
+                        let response = JsonRpcResponse {
                             jsonrpc: "2.0".to_string(),
                             id: request.id,
                             result: Some(res),
@@ -105,7 +105,7 @@ impl JsonRpcServer {
     }
 
     fn create_error_response<E: Display>(&self, id: u64, code: i32, message: E) -> String {
-        let response = Response {
+        let response = JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
             id,
             result: None,
