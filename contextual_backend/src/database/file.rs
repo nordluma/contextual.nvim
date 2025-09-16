@@ -37,12 +37,13 @@ impl FileDatabase {
 
 impl Store for FileDatabase {
     async fn save_note(&self, new_note: NewNote) -> Result<Uuid, anyhow::Error> {
-        if !tokio::fs::try_exists(&self.dir).await? {
-            tokio::fs::create_dir_all(&self.dir).await?;
+        let note_dir = self.dir.join("notes");
+        if !tokio::fs::try_exists(&note_dir).await? {
+            tokio::fs::create_dir_all(&note_dir).await?;
         }
 
         let note = Note::new(new_note);
-        let note_file = self.dir.join(note.id.to_string());
+        let note_file = note_dir.join(note.id.to_string());
         let note_id = note.id;
         write_file(note_file, note).await?;
 
@@ -50,7 +51,7 @@ impl Store for FileDatabase {
     }
 
     async fn get_note(&self, note_id: Uuid) -> Result<Note, anyhow::Error> {
-        let note_file = self.dir.join(note_id.to_string());
+        let note_file = self.dir.join("notes").join(note_id.to_string());
         let file = std::fs::File::open(note_file)?;
         let note = serde_json::from_reader(file)?;
 
