@@ -12,8 +12,7 @@ use contextual_backend::{
 async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse_and_validate();
 
-    let db = FileDatabase::init();
-    let handler = Arc::new(Handler::new(db));
+    let handler = Arc::new(Handler::new(FileDatabase::init().await));
     let mut server = JsonRpcServer::new();
     let handler_clone = Arc::clone(&handler);
     server.register_method(
