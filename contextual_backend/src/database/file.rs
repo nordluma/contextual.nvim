@@ -4,12 +4,13 @@ use anyhow::Context;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::types::{
-    NewNote, Note,
-    todo::{NewTodoItem, TodoItem},
+use crate::{
+    database::{NoteStorage, TodoStorage},
+    types::{
+        NewNote, Note,
+        todo::{NewTodoItem, TodoItem},
+    },
 };
-
-use super::Store;
 
 pub struct FileDatabase {
     dir: PathBuf,
@@ -35,7 +36,8 @@ impl FileDatabase {
     }
 }
 
-impl Store for FileDatabase {
+#[async_trait::async_trait]
+impl NoteStorage for FileDatabase {
     async fn save_note(&self, new_note: NewNote) -> Result<Uuid, anyhow::Error> {
         let note_dir = self.dir.join("notes");
         if !tokio::fs::try_exists(&note_dir).await? {
@@ -69,7 +71,10 @@ impl Store for FileDatabase {
     async fn delete_note(&self, _note_id: u64) -> Result<(), anyhow::Error> {
         todo!()
     }
+}
 
+#[async_trait::async_trait]
+impl TodoStorage for FileDatabase {
     async fn save_todo(&self, new_todo: NewTodoItem) -> Result<Uuid, anyhow::Error> {
         if !tokio::fs::try_exists(&self.dir).await? {
             tokio::fs::create_dir_all(&self.dir).await?;
@@ -81,6 +86,10 @@ impl Store for FileDatabase {
         write_file(todo_file, todo_item).await?;
 
         Ok(todo_id)
+    }
+
+    async fn get_todos(&self) -> Result<Vec<TodoItem>, anyhow::Error> {
+        todo!()
     }
 }
 
@@ -103,7 +112,7 @@ async fn write_file<S: Serialize + Send + 'static>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        database::{Store, file::FileDatabase},
+        database::{NoteStorage, file::FileDatabase},
         types::{NewNote, NoteContext},
     };
 

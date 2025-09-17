@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc};
 use tokio::net::UnixListener;
 
 use crate::{
-    jsonrpc::JsonRpcServer,
+    router::RouterFactory,
     transport::{Transport, handle_client},
 };
 
@@ -26,7 +26,7 @@ impl std::fmt::Display for UnixTransport {
 }
 
 impl Transport for UnixTransport {
-    async fn start(self, server: JsonRpcServer) -> Result<(), anyhow::Error> {
+    async fn start(self, server: RouterFactory) -> Result<(), anyhow::Error> {
         if self.socket.exists() {
             std::fs::remove_file(&self.socket)?;
         }
@@ -39,9 +39,9 @@ impl Transport for UnixTransport {
             match listener.accept().await {
                 Ok((stream, client_addr)) => {
                     eprintln!("New connection from: {client_addr:?}");
-                    let server_clone = server.clone();
+                    let service = server.service();
                     tokio::spawn(async move {
-                        if let Err(e) = handle_client(stream, server_clone).await {
+                        if let Err(e) = handle_client(stream, service).await {
                             eprintln!("Connection error: {e}");
                         }
                     })

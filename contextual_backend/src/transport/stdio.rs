@@ -3,19 +3,19 @@ use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
-    jsonrpc::JsonRpcServer,
+    router::RouterFactory,
     transport::{Transport, handle_client},
 };
 
 pub struct StdIoTransport;
 
 impl Transport for StdIoTransport {
-    async fn start(self, server: JsonRpcServer) -> Result<(), anyhow::Error> {
+    async fn start(self, server: RouterFactory) -> Result<(), anyhow::Error> {
         println!("Server listening on stdin/stdout");
         let server = Arc::new(server);
         let stream = CombinedStream::new(tokio::io::stdin(), tokio::io::stdout());
 
-        handle_client(stream, server).await?;
+        handle_client(stream, server.service()).await?;
 
         Ok(())
     }

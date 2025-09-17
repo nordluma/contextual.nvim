@@ -1,12 +1,12 @@
 use serde_json::{Value, json};
 
-use crate::{database::Store, types::todo::NewTodoItems};
+use crate::{database::Storage, types::todo::NewTodoItems};
 
 pub struct Handler<DB> {
     database: DB,
 }
 
-impl<DB: Store> Handler<DB> {
+impl<DB: Storage> Handler<DB> {
     pub fn new(database: DB) -> Self {
         Self { database }
     }

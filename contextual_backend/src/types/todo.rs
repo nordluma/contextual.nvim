@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
+#[allow(unused)]
 pub struct NewTodoItems(Vec<NewTodoItems>);
 
 #[derive(Debug)]

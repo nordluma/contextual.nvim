@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use tokio::net::TcpListener;
 
 use crate::{
-    jsonrpc::JsonRpcServer,
+    router::RouterFactory,
     transport::{Transport, handle_client},
 };
 
@@ -28,18 +26,17 @@ impl TcpTransport {
 }
 
 impl Transport for TcpTransport {
-    async fn start(self, server: JsonRpcServer) -> Result<(), anyhow::Error> {
+    async fn start(self, server: RouterFactory) -> Result<(), anyhow::Error> {
         let listener = TcpListener::bind(format!("{self}")).await?;
         println!("Server listening on {self}");
-        let server = Arc::new(server);
 
         loop {
             let (stream, client_addr) = listener.accept().await?;
-            let server_clone = Arc::clone(&server);
+            let service = server.service();
             eprintln!("New connection from: {client_addr}");
 
             tokio::spawn(async move {
-                if let Err(e) = handle_client(stream, server_clone).await {
+                if let Err(e) = handle_client(stream, service).await {
                     eprintln!("Connection error: {e}");
                 }
             });

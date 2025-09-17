@@ -1,11 +1,13 @@
-use std::sync::Arc;
-
 use tokio::io::{
     AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
     Error as IoError, ErrorKind as IoErrorKind, Result as IoResult,
 };
 
-use crate::jsonrpc::JsonRpcServer;
+use crate::{
+    jsonrpc::{JsonRpcRequest, JsonRpcResponse},
+    router::{RouterFactory, RouterService},
+    service::Service,
+};
 
 pub mod stdio;
 pub mod tcp;
@@ -18,11 +20,11 @@ pub trait AsyncStream: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 impl<T> AsyncStream for T where T: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 
 pub trait Transport {
-    fn start(self, server: JsonRpcServer)
+    fn start(self, server: RouterFactory)
     -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
-async fn handle_client<S>(stream: S, server: Arc<JsonRpcServer>) -> tokio::io::Result<()>
+async fn handle_client<S>(stream: S, mut server: RouterService) -> tokio::io::Result<()>
 where
     S: AsyncStream,
 {
@@ -30,11 +32,26 @@ where
     let mut reader = BufReader::new(read_half);
     let mut writer = write_half;
 
+    // let server_clone = Arc::clone(&server);
     loop {
         match read_message(&mut reader).await {
             Ok(message) => {
                 println!("Received: {message}");
-                let response = server.handle_request(message).await;
+                let response = match serde_json::from_str::<JsonRpcRequest>(&message) {
+                    Ok(msg) => server.call(msg).await,
+                    Err(e) => JsonRpcResponse {
+                        jsonrpc: "2.0".into(),
+                        id: 0,
+                        result: None,
+                        error: Some(crate::jsonrpc::ResponseError {
+                            code: -32700,
+                            message: format!("Parse error: {e}"),
+                        }),
+                    },
+                };
+
+                // let response = server.handle_request(message).await;
+                let response = serde_json::to_string(&response).expect("response json is valid");
                 write_message(&mut writer, &response).await?;
             }
             Err(e) => {

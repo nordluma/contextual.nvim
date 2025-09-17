@@ -7,19 +7,20 @@ use crate::types::{
 
 pub mod file;
 
-pub trait Store: Sized {
-    fn save_note(&self, new_note: NewNote) -> impl Future<Output = Result<Uuid, anyhow::Error>>;
-    fn get_note(&self, note_id: Uuid) -> impl Future<Output = Result<Note, anyhow::Error>>;
-    fn get_notes(&self) -> impl Future<Output = Result<Vec<String>, anyhow::Error>>;
-    fn update_note(
-        &self,
-        note_id: u64,
-        updated_note: String,
-    ) -> impl Future<Output = Result<(), anyhow::Error>>;
-    fn delete_note(&self, note_id: u64) -> impl Future<Output = Result<(), anyhow::Error>>;
+pub trait Storage: NoteStorage + TodoStorage {}
+impl<T: NoteStorage + TodoStorage> Storage for T {}
 
-    fn save_todo(&self, new_todo: NewTodoItem)
-    -> impl Future<Output = Result<Uuid, anyhow::Error>>;
+#[async_trait::async_trait]
+pub trait NoteStorage: Send + Sync {
+    async fn save_note(&self, new_note: NewNote) -> Result<Uuid, anyhow::Error>;
+    async fn get_note(&self, note_id: Uuid) -> Result<Note, anyhow::Error>;
+    async fn get_notes(&self) -> Result<Vec<String>, anyhow::Error>;
+    async fn update_note(&self, note_id: u64, updated_note: String) -> Result<(), anyhow::Error>;
+    async fn delete_note(&self, note_id: u64) -> Result<(), anyhow::Error>;
+}
 
-    fn get_todos(&self) -> impl Future<Output = Result<Vec<TodoItem>, anyhow::Error>>;
+#[async_trait::async_trait]
+pub trait TodoStorage: Send + Sync {
+    async fn save_todo(&self, new_todo: NewTodoItem) -> Result<Uuid, anyhow::Error>;
+    async fn get_todos(&self) -> Result<Vec<TodoItem>, anyhow::Error>;
 }
