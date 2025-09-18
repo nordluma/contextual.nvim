@@ -9,6 +9,7 @@ use crate::{
     service::Service,
 };
 
+pub mod codec;
 pub mod stdio;
 pub mod tcp;
 pub mod unix_socket;
@@ -32,7 +33,6 @@ where
     let mut reader = BufReader::new(read_half);
     let mut writer = write_half;
 
-    // let server_clone = Arc::clone(&server);
     loop {
         match read_message(&mut reader).await {
             Ok(message) => {
@@ -50,7 +50,6 @@ where
                     },
                 };
 
-                // let response = server.handle_request(message).await;
                 let response = serde_json::to_string(&response).expect("response json is valid");
                 write_message(&mut writer, &response).await?;
             }
