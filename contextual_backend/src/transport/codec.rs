@@ -3,7 +3,14 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, ReadHal
 use crate::transport::AsyncStream;
 
 #[async_trait::async_trait]
-pub trait Framer {
+pub trait Framer<S>
+where
+    S: AsyncStream,
+{
+    fn new(stream: S) -> Self
+    where
+        Self: Sized;
+
     async fn read_frame(&mut self) -> std::io::Result<String>;
     async fn write_frame(&mut self, frame: &[u8]) -> std::io::Result<()>;
 }
@@ -33,10 +40,18 @@ where
 }
 
 #[async_trait::async_trait]
-impl<S> Framer for LengthDelimited<S>
+impl<S> Framer<S> for LengthDelimited<S>
 where
     S: AsyncStream,
 {
+    fn new(stream: S) -> Self {
+        Self::new(stream)
+    }
+
+    /// Read a single JSON-RPC message from reader.
+    ///
+    /// Expects a header section ending with and empty line (i.e. "\r\n") and then
+    /// reads the message body based on the Content-Length header.
     async fn read_frame(&mut self) -> std::io::Result<String> {
         use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 
@@ -77,6 +92,10 @@ where
             .map_err(|_| IoError::new(IoErrorKind::InvalidData, "Invalid UTF-8 message"))
     }
 
+    /// Write a single JSON-RPC message to the writer.
+    ///
+    /// Write a header with the Content-Length followed by two CRLFs and then write
+    /// the message payload.
     async fn write_frame(&mut self, frame: &[u8]) -> std::io::Result<()> {
         let content_len = frame.len();
         let header = format!("Content-Length: {content_len}\r\n\r\n");

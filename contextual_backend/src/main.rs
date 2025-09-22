@@ -1,7 +1,13 @@
 use contextual_backend::{
     args::{Args, TransportType},
     router::RouterFactory,
-    transport::{Transport, stdio::StdIoTransport, tcp::TcpTransport, unix_socket::UnixTransport},
+    transport::{
+        Server,
+        codec::LengthDelimited,
+        stdio::{CombinedStream, StdIoTransport},
+        tcp::TcpTransport,
+        unix_socket::UnixTransport,
+    },
 };
 
 #[tokio::main]
@@ -10,37 +16,27 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let router = RouterFactory::new();
 
-    // let mut server = JsonRpcServer::new();
-    // let handler_clone = Arc::clone(&handler);
-    // server.register_method(
-    //     "contextual/saveNote",
-    //     Box::new(move |params| -> HandlerFut {
-    //         let handler = Arc::clone(&handler_clone);
-    //         Box::pin(async move { handler.save_note(params).await })
-    //     }),
-    // );
-    //
-    // let handler_clone = Arc::clone(&handler);
-    // server.register_method(
-    //     "contextual/newTodo",
-    //     Box::new(move |params| -> HandlerFut {
-    //         let handler = Arc::clone(&handler_clone);
-    //         Box::pin(async move { handler.save_todo_item(params).await })
-    //     }),
-    // );
-    //
-    // let handler_clone = Arc::clone(&handler);
-    // server.register_method(
-    //     "contextual/syncTodos",
-    //     Box::new(move |params| -> HandlerFut {
-    //         let handler = Arc::clone(&handler_clone);
-    //         Box::pin(async move { handler.sync_todos(params).await })
-    //     }),
-    // );
-
     match args.transport {
-        TransportType::Unix { socket_path } => UnixTransport::new(socket_path).start(router).await,
-        TransportType::Tcp { host, port } => TcpTransport::new(&host, port).start(router).await,
-        TransportType::Stdio => StdIoTransport.start(router).await,
+        TransportType::Unix { socket_path } => {
+            type F = LengthDelimited<tokio::net::UnixStream>;
+
+            Server::<_, F>::new(UnixTransport::<F>::new(socket_path))
+                .start(router)
+                .await
+        }
+        TransportType::Tcp { host, port } => {
+            type F = LengthDelimited<tokio::net::TcpStream>;
+
+            Server::<_, F>::new(TcpTransport::<F>::new(&host, port))
+                .start(router)
+                .await
+        }
+        TransportType::Stdio => {
+            type F = LengthDelimited<CombinedStream<tokio::io::Stdin, tokio::io::Stdout>>;
+
+            Server::<_, F>::new(StdIoTransport::<F>::new())
+                .start(router)
+                .await
+        }
     }
 }
