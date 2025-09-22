@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::{
@@ -21,27 +19,26 @@ pub trait AsyncStream: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 impl<T> AsyncStream for T where T: AsyncRead + AsyncWrite + Unpin + Send + 'static {}
 
 pub trait Transport {
+    type Stream: AsyncStream + Send + 'static;
+    type Framer: Framer<Self::Stream> + Send + 'static;
+
     fn start(self, server: RouterFactory)
     -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
-pub struct Server<T, F>
+pub struct Server<T>
 where
     T: Transport,
 {
     transport: T,
-    _marker: PhantomData<F>,
 }
 
-impl<T, F> Server<T, F>
+impl<T> Server<T>
 where
     T: Transport,
 {
     pub fn new(transport: T) -> Self {
-        Self {
-            transport,
-            _marker: PhantomData,
-        }
+        Self { transport }
     }
 
     pub fn start(
@@ -52,13 +49,11 @@ where
     }
 }
 
-pub async fn handle_client<S, F>(stream: S, mut server: RouterService) -> anyhow::Result<()>
+pub async fn handle_client<S, F>(mut framer: F, mut server: RouterService) -> anyhow::Result<()>
 where
     S: AsyncStream,
     F: Framer<S>,
 {
-    let mut framer = F::new(stream);
-
     loop {
         let message = match framer.read_frame().await {
             Ok(msg) => msg,

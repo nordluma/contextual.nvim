@@ -1,34 +1,24 @@
-use std::marker::PhantomData;
-
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, Stdin, Stdout};
 
 use crate::{
     router::RouterFactory,
-    transport::{Transport, codec::Framer, handle_client},
+    transport::{Transport, codec::LengthDelimited, handle_client},
 };
 
-pub struct StdIoTransport<F> {
-    _framer: PhantomData<F>,
-}
+pub struct StdIoTransport;
 
-impl<F> StdIoTransport<F> {
-    pub fn new() -> Self {
-        Self {
-            _framer: PhantomData,
-        }
-    }
-}
+impl Transport for StdIoTransport {
+    type Stream = CombinedStream<Stdin, Stdout>;
+    type Framer = LengthDelimited<Self::Stream>;
 
-impl<F> Transport for StdIoTransport<F>
-where
-    F: Framer<CombinedStream<tokio::io::Stdin, tokio::io::Stdout>> + Send + 'static,
-{
     async fn start(self, server: RouterFactory) -> Result<(), anyhow::Error> {
+        use tokio::io::{stdin, stdout};
+
         println!("Server listening on stdin/stdout");
         let service = server.service();
-        let stream = CombinedStream::new(tokio::io::stdin(), tokio::io::stdout());
+        let framer = Self::Framer::new(CombinedStream::new(stdin(), stdout()));
 
-        handle_client::<_, F>(stream, service).await?;
+        handle_client(framer, service).await?;
 
         Ok(())
     }

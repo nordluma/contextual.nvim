@@ -1,42 +1,38 @@
-use std::{marker::PhantomData, path::PathBuf};
-
-use tokio::net::UnixListener;
+use std::path::PathBuf;
 
 use crate::{
     router::RouterFactory,
-    transport::{Transport, codec::Framer, handle_client},
+    transport::{Transport, codec::LengthDelimited, handle_client},
 };
 
-pub struct UnixTransport<F> {
+pub struct UnixTransport {
     socket: PathBuf,
-    _framer: PhantomData<F>,
 }
 
-impl<F> UnixTransport<F> {
+impl UnixTransport {
     pub fn new(socket: impl Into<PathBuf>) -> Self {
         Self {
             socket: socket.into(),
-            _framer: PhantomData,
         }
     }
 }
 
-impl<F> std::fmt::Display for UnixTransport<F> {
+impl std::fmt::Display for UnixTransport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.socket.display())
     }
 }
 
-impl<F> Transport for UnixTransport<F>
-where
-    F: Framer<tokio::net::UnixStream> + Send,
-{
+impl Transport for UnixTransport {
+    type Stream = tokio::net::UnixStream;
+    type Framer = LengthDelimited<Self::Stream>;
+
     async fn start(self, server: RouterFactory) -> Result<(), anyhow::Error> {
         if self.socket.exists() {
             std::fs::remove_file(&self.socket)?;
         }
 
-        let listener = UnixListener::bind(&self.socket)?;
+        let listener = tokio::net::UnixListener::bind(&self.socket)?;
         println!("Server listening on {self}");
 
         loop {
@@ -44,8 +40,9 @@ where
                 Ok((stream, client_addr)) => {
                     eprintln!("New connection from: {client_addr:?}");
                     let service = server.service();
+                    let framer = Self::Framer::new(stream);
                     tokio::spawn(async move {
-                        if let Err(e) = handle_client::<_, F>(stream, service).await {
+                        if let Err(e) = handle_client(framer, service).await {
                             eprintln!("Connection error: {e}");
                         }
                     })

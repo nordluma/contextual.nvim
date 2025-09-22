@@ -1,40 +1,34 @@
-use std::marker::PhantomData;
-
-use tokio::net::TcpListener;
-
 use crate::{
     router::RouterFactory,
-    transport::{Transport, codec::Framer, handle_client},
+    transport::{Transport, codec::LengthDelimited, handle_client},
 };
 
-pub struct TcpTransport<F> {
+pub struct TcpTransport {
     host: String,
     port: u16,
-    _framer: PhantomData<F>,
 }
 
-impl<F> std::fmt::Display for TcpTransport<F> {
+impl std::fmt::Display for TcpTransport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}", self.host, self.port)
     }
 }
 
-impl<F> TcpTransport<F> {
+impl TcpTransport {
     pub fn new(host: &str, port: u16) -> Self {
         Self {
             host: host.to_string(),
             port,
-            _framer: PhantomData,
         }
     }
 }
 
-impl<F> Transport for TcpTransport<F>
-where
-    F: Framer<tokio::net::TcpStream> + Send + 'static,
-{
+impl Transport for TcpTransport {
+    type Stream = tokio::net::TcpStream;
+    type Framer = LengthDelimited<Self::Stream>;
+
     async fn start(self, server: RouterFactory) -> Result<(), anyhow::Error> {
-        let listener = TcpListener::bind(format!("{self}")).await?;
+        let listener = tokio::net::TcpListener::bind(format!("{self}")).await?;
         println!("Server listening on {self}");
 
         loop {
@@ -42,8 +36,9 @@ where
             let service = server.service();
             eprintln!("New connection from: {client_addr}");
 
+            let framer = Self::Framer::new(stream);
             tokio::spawn(async move {
-                if let Err(e) = handle_client::<_, F>(stream, service).await {
+                if let Err(e) = handle_client(framer, service).await {
                     eprintln!("Connection error: {e}");
                 }
             });
