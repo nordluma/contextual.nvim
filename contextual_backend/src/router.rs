@@ -61,15 +61,13 @@ impl Service<JsonRpcRequest> for RouterService {
             })
         } else {
             Box::pin(async move {
-                Ok(JsonRpcResponse {
-                    jsonrpc: "2.0".into(),
+                Ok(JsonRpcResponse::from_error(
                     id,
-                    result: None,
-                    error: Some(ResponseError {
+                    ResponseError {
                         code: -32601,
                         message: format!("Method note found: {}", req.method),
-                    }),
-                })
+                    },
+                ))
             })
         }
     }
