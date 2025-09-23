@@ -66,16 +66,17 @@ where
         println!("Received: {message}");
 
         let response = match serde_json::from_str::<JsonRpcRequest>(&message) {
-            Ok(msg) => server.call(msg).await,
-            Err(e) => JsonRpcResponse {
-                jsonrpc: "2.0".into(),
-                id: 0,
-                result: None,
-                error: Some(ResponseError {
+            Ok(msg) => match server.call(msg).await {
+                Ok(res) => res,
+                Err(_) => unreachable!("all error should be handled by router service"),
+            },
+            Err(e) => JsonRpcResponse::from_error(
+                0,
+                ResponseError {
                     code: -32700,
                     message: format!("Parse error: {e}"),
-                }),
-            },
+                },
+            ),
         };
 
         let response = serde_json::to_vec(&response)?;

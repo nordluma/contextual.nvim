@@ -4,7 +4,8 @@ use futures::future::BoxFuture;
 
 pub trait Service<Request> {
     type Response;
-    type Future: Future<Output = Self::Response> + Send;
+    type Error;
+    type Future: Future<Output = Result<Self::Response, Self::Error>> + Send;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<()> {
         Poll::Ready(())
@@ -13,21 +14,23 @@ pub trait Service<Request> {
     fn call(&mut self, req: Request) -> Self::Future;
 }
 
-pub trait CloneableService<Req, Res>:
-    Service<Req, Response = Res, Future = BoxFuture<'static, Res>> + Send + Sync
+pub trait CloneableService<Req, Res, Err>:
+    Service<Req, Response = Res, Error = Err, Future = BoxFuture<'static, Result<Res, Err>>>
+    + Send
+    + Sync
 {
-    fn clone_box(&self) -> Box<dyn CloneableService<Req, Res>>;
+    fn clone_box(&self) -> Box<dyn CloneableService<Req, Res, Err>>;
 }
 
-impl<Req, Res, T> CloneableService<Req, Res> for T
+impl<Req, Res, Err, T> CloneableService<Req, Res, Err> for T
 where
-    T: Service<Req, Response = Res, Future = BoxFuture<'static, Res>>
+    T: Service<Req, Response = Res, Error = Err, Future = BoxFuture<'static, Result<Res, Err>>>
         + Clone
         + Send
         + Sync
         + 'static,
 {
-    fn clone_box(&self) -> Box<dyn CloneableService<Req, Res>> {
+    fn clone_box(&self) -> Box<dyn CloneableService<Req, Res, Err>> {
         Box::new(self.clone())
     }
 }

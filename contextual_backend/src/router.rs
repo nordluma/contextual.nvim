@@ -9,7 +9,7 @@ use crate::{
 };
 
 pub struct RouterFactory {
-    routes: Arc<HashMap<String, Arc<dyn CloneableService<JsonRpcRequest, Value>>>>,
+    routes: Arc<HashMap<String, Arc<dyn CloneableService<JsonRpcRequest, Value, ResponseError>>>>,
 }
 
 impl RouterFactory {
@@ -21,7 +21,7 @@ impl RouterFactory {
 
     pub fn with_route<S>(self, method: &str, svc: S) -> Self
     where
-        S: CloneableService<JsonRpcRequest, Value> + 'static,
+        S: CloneableService<JsonRpcRequest, Value, ResponseError> + 'static,
     {
         let mut routes = (*self.routes).clone();
         routes.insert(method.into(), Arc::new(svc));
@@ -38,12 +38,13 @@ impl RouterFactory {
 }
 
 pub struct RouterService {
-    routes: Arc<HashMap<String, Arc<dyn CloneableService<JsonRpcRequest, Value>>>>,
+    routes: Arc<HashMap<String, Arc<dyn CloneableService<JsonRpcRequest, Value, ResponseError>>>>,
 }
 
 impl Service<JsonRpcRequest> for RouterService {
     type Response = JsonRpcResponse;
-    type Future = BoxFuture<'static, JsonRpcResponse>;
+    type Error = ();
+    type Future = BoxFuture<'static, Result<JsonRpcResponse, Self::Error>>;
 
     fn call(&mut self, req: JsonRpcRequest) -> Self::Future {
         let id = req.id;
@@ -51,17 +52,16 @@ impl Service<JsonRpcRequest> for RouterService {
         if let Some(svc) = self.routes.get(&req.method) {
             let mut svc = svc.clone_box();
             Box::pin(async move {
-                let res = svc.call(req).await;
-                JsonRpcResponse {
-                    jsonrpc: "2.0".into(),
-                    id,
-                    result: Some(res),
-                    error: None,
-                }
+                let response = match svc.call(req).await {
+                    Ok(res) => JsonRpcResponse::ok(id, res),
+                    Err(e) => JsonRpcResponse::from_error(id, e),
+                };
+
+                Ok(response)
             })
         } else {
             Box::pin(async move {
-                JsonRpcResponse {
+                Ok(JsonRpcResponse {
                     jsonrpc: "2.0".into(),
                     id,
                     result: None,
@@ -69,7 +69,7 @@ impl Service<JsonRpcRequest> for RouterService {
                         code: -32601,
                         message: format!("Method note found: {}", req.method),
                     }),
-                }
+                })
             })
         }
     }

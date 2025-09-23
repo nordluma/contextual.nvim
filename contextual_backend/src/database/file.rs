@@ -12,6 +12,7 @@ use crate::{
     },
 };
 
+#[derive(Clone)]
 pub struct FileDatabase {
     dir: PathBuf,
 }

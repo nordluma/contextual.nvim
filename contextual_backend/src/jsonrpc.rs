@@ -18,6 +18,26 @@ pub struct JsonRpcResponse {
     pub error: Option<ResponseError>,
 }
 
+impl JsonRpcResponse {
+    pub fn ok(id: u64, response: Value) -> Self {
+        Self {
+            jsonrpc: "2.0".into(),
+            id,
+            result: Some(response),
+            error: None,
+        }
+    }
+
+    pub fn from_error(id: u64, error: ResponseError) -> Self {
+        Self {
+            jsonrpc: "2.0".into(),
+            id,
+            result: None,
+            error: Some(error),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ResponseError {
     pub code: i32,
