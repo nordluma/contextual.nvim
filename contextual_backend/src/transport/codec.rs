@@ -1,6 +1,9 @@
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, ReadHalf, WriteHalf};
 
-use crate::transport::AsyncStream;
+use crate::{
+    jsonrpc::{JsonRpcRequest, JsonRpcResponse},
+    transport::AsyncStream,
+};
 
 #[async_trait::async_trait]
 pub trait Framer<S>
@@ -15,9 +18,22 @@ where
     async fn write_frame(&mut self, frame: &[u8]) -> std::io::Result<()>;
 }
 
-pub trait Codec<Req, Res> {
+pub trait Codec<Req, Res>: Copy + Send + 'static {
     fn decode(&self, bytes: &[u8]) -> Result<Req, anyhow::Error>;
     fn encode(&self, res: &Res) -> Result<Vec<u8>, anyhow::Error>;
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct JsonRpcCodec;
+
+impl Codec<JsonRpcRequest, JsonRpcResponse> for JsonRpcCodec {
+    fn decode(&self, bytes: &[u8]) -> Result<JsonRpcRequest, anyhow::Error> {
+        serde_json::from_slice(bytes).map_err(|e| anyhow::anyhow!(e))
+    }
+
+    fn encode(&self, res: &JsonRpcResponse) -> Result<Vec<u8>, anyhow::Error> {
+        serde_json::to_vec(res).map_err(|e| anyhow::anyhow!(e))
+    }
 }
 
 pub struct LengthDelimited<S> {

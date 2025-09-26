@@ -1,6 +1,11 @@
 use crate::{
+    jsonrpc::{JsonRpcRequest, JsonRpcResponse},
     router::RouterFactory,
-    transport::{Transport, codec::LengthDelimited, handle_client},
+    transport::{
+        Transport,
+        codec::{Codec, LengthDelimited},
+        handle_client,
+    },
 };
 
 pub struct TcpTransport {
@@ -27,7 +32,11 @@ impl Transport for TcpTransport {
     type Stream = tokio::net::TcpStream;
     type Framer = LengthDelimited<Self::Stream>;
 
-    async fn start(self, server: RouterFactory) -> Result<(), anyhow::Error> {
+    async fn start<C: Codec<JsonRpcRequest, JsonRpcResponse> + 'static>(
+        self,
+        server: RouterFactory,
+        codec: C,
+    ) -> Result<(), anyhow::Error> {
         let listener = tokio::net::TcpListener::bind(format!("{self}")).await?;
         println!("Server listening on {self}");
 
@@ -38,7 +47,7 @@ impl Transport for TcpTransport {
 
             let framer = Self::Framer::new(stream);
             tokio::spawn(async move {
-                if let Err(e) = handle_client(framer, service).await {
+                if let Err(e) = handle_client(framer, codec, service).await {
                     eprintln!("Connection error: {e}");
                 }
             });

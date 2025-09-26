@@ -4,7 +4,7 @@ use crate::{
     jsonrpc::{JsonRpcRequest, JsonRpcResponse, ResponseError},
     router::{RouterFactory, RouterService},
     service::Service,
-    transport::codec::Framer,
+    transport::codec::{Codec, Framer},
 };
 
 pub mod codec;
@@ -22,37 +22,48 @@ pub trait Transport {
     type Stream: AsyncStream + Send + 'static;
     type Framer: Framer<Self::Stream> + Send + 'static;
 
-    fn start(self, server: RouterFactory)
-    -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+    fn start<C: Codec<JsonRpcRequest, JsonRpcResponse>>(
+        self,
+        server: RouterFactory,
+        codec: C,
+    ) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }
 
-pub struct Server<T>
+pub struct Server<T, C>
 where
     T: Transport,
+    C: Codec<JsonRpcRequest, JsonRpcResponse>,
 {
     transport: T,
+    codec: C,
 }
 
-impl<T> Server<T>
+impl<T, C> Server<T, C>
 where
     T: Transport,
+    C: Codec<JsonRpcRequest, JsonRpcResponse>,
 {
-    pub fn new(transport: T) -> Self {
-        Self { transport }
+    pub fn new(transport: T, codec: C) -> Self {
+        Self { transport, codec }
     }
 
     pub fn start(
         self,
         router_factory: RouterFactory,
     ) -> impl Future<Output = Result<(), anyhow::Error>> + Send {
-        self.transport.start(router_factory)
+        self.transport.start(router_factory, self.codec)
     }
 }
 
-pub async fn handle_client<S, F>(mut framer: F, mut server: RouterService) -> anyhow::Result<()>
+pub async fn handle_client<S, F, C>(
+    mut framer: F,
+    codec: C,
+    mut server: RouterService,
+) -> anyhow::Result<()>
 where
     S: AsyncStream,
     F: Framer<S>,
+    C: Codec<JsonRpcRequest, JsonRpcResponse>,
 {
     loop {
         let message = match framer.read_frame().await {
@@ -65,7 +76,7 @@ where
 
         println!("Received: {message}");
 
-        let response = match serde_json::from_str::<JsonRpcRequest>(&message) {
+        let response = match codec.decode(message.as_bytes()) {
             Ok(msg) => match server.call(msg).await {
                 Ok(res) => res,
                 Err(_) => unreachable!("all error should be handled by router service"),
@@ -79,7 +90,7 @@ where
             ),
         };
 
-        let response = serde_json::to_vec(&response)?;
+        let response = codec.encode(&response)?;
         if let Err(e) = framer.write_frame(&response).await {
             eprintln!("Error writing frame: {e}");
             break;

@@ -1,8 +1,13 @@
 use tokio::io::{AsyncRead, AsyncWrite, Stdin, Stdout};
 
 use crate::{
+    jsonrpc::{JsonRpcRequest, JsonRpcResponse},
     router::RouterFactory,
-    transport::{Transport, codec::LengthDelimited, handle_client},
+    transport::{
+        Transport,
+        codec::{Codec, LengthDelimited},
+        handle_client,
+    },
 };
 
 pub struct StdIoTransport;
@@ -11,14 +16,18 @@ impl Transport for StdIoTransport {
     type Stream = CombinedStream<Stdin, Stdout>;
     type Framer = LengthDelimited<Self::Stream>;
 
-    async fn start(self, server: RouterFactory) -> Result<(), anyhow::Error> {
+    async fn start<C: Codec<JsonRpcRequest, JsonRpcResponse> + Send>(
+        self,
+        server: RouterFactory,
+        codec: C,
+    ) -> Result<(), anyhow::Error> {
         use tokio::io::{stdin, stdout};
 
         println!("Server listening on stdin/stdout");
         let service = server.service();
         let framer = Self::Framer::new(CombinedStream::new(stdin(), stdout()));
 
-        handle_client(framer, service).await?;
+        handle_client(framer, codec, service).await?;
 
         Ok(())
     }
