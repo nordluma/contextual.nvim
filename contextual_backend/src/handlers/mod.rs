@@ -2,6 +2,9 @@ use serde_json::{Value, json};
 
 use crate::{database::Storage, types::todo::NewTodoItems};
 
+pub mod echo;
+pub mod todo;
+
 pub struct Handler<DB> {
     database: DB,
 }
