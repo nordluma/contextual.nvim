@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use uuid::Uuid;
 
+use crate::types::get_str;
+
 #[allow(unused)]
-pub struct NewTodoItems(Vec<NewTodoItems>);
+pub struct NewTodoItems(Vec<NewTodoItem>);
 
 #[derive(Debug)]
 pub struct NewTodoItem {
@@ -19,29 +21,11 @@ impl TryFrom<JsonValue> for NewTodoItem {
     type Error = anyhow::Error;
 
     fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
-        let branch = value
-            .get("branch")
-            .and_then(|b| b.as_str())
-            .context("branch required")?
-            .to_owned();
-
-        let file_path = value
-            .get("file_path")
-            .and_then(|f| f.as_str())
-            .context("filename required")?
-            .to_owned();
-
-        let line_number = value
-            .get("line_number")
-            .and_then(|l| l.as_u64())
-            .context("line number required")?
-            .to_owned();
-
-        let content = value
-            .get("content")
-            .and_then(|c| c.as_str())
-            .context("content required")?
-            .to_owned();
+        let branch = get_str(&value, "branch")?;
+        let file_path = get_str(&value, "file_path")?;
+        let line_number = get_str(&value, "line_number")
+            .and_then(|l| l.parse().context("failed to parse line_number"))?;
+        let content = get_str(&value, "content")?;
 
         Ok(Self {
             branch,
@@ -56,13 +40,12 @@ impl TryFrom<JsonValue> for NewTodoItems {
     type Error = anyhow::Error;
 
     fn try_from(value: JsonValue) -> Result<Self, Self::Error> {
-        let items = value
+        let todo_items = value
             .as_array()
-            .context("params is expected to be an array")?;
-
-        let todo_items = items
+            .cloned()
+            .context("params is expected to be an array")?
             .into_iter()
-            .flat_map(|i| i.to_owned().try_into())
+            .flat_map(NewTodoItem::try_from)
             .collect();
 
         Ok(NewTodoItems(todo_items))

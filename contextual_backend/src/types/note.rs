@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 use uuid::Uuid;
 
+use crate::types::get_str;
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct NoteContext {
     pub filename: String,
@@ -75,12 +77,7 @@ impl TryFrom<JsonValue> for NewNote {
             .cloned()
             .context("Invalid context")?
             .try_into()?;
-
-        let content = value
-            .get("content")
-            .and_then(|c| c.as_str())
-            .context("content is required")?
-            .to_owned();
+        let content = get_str(&value, "content")?;
 
         Ok(Self { context, content })
     }
