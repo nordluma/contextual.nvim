@@ -1,34 +1,36 @@
-use std::sync::Arc;
-
 use contextual_backend::{
     args::{Args, TransportType},
     database::file::FileDatabase,
-    handlers::Handler,
-    jsonrpc::JsonRpcServer,
-    transport::{Transport, stdio::StdIoTransport, tcp::TcpTransport, unix_socket::UnixTransport},
+    handlers::{echo::EchoService, todo::NewTodoService},
+    router::RouterFactory,
+    transport::{
+        Server, codec::JsonRpcCodec, stdio::StdIoTransport, tcp::TcpTransport,
+        unix_socket::UnixTransport,
+    },
 };
-use futures::future::BoxFuture;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), anyhow::Error> {
     let args = Args::parse_and_validate();
+    let storage = FileDatabase::init().await;
 
-    let db = FileDatabase::init();
-    let handler = Arc::new(Handler::new(db));
-    let mut server = JsonRpcServer::new();
-    server.register_method(
-        "contextual/saveNote".to_string(),
-        Box::new(
-            move |params| -> BoxFuture<'static, Result<serde_json::Value, String>> {
-                let handler = Arc::clone(&handler);
-                Box::pin(async move { handler.save_note(params).await })
-            },
-        ),
-    );
+    let router = RouterFactory::new()
+        .with_route("contextual/echo", EchoService)
+        .with_route("contextual/new_todo", NewTodoService::new(storage.clone()));
+
+    let codec = JsonRpcCodec;
 
     match args.transport {
-        TransportType::Unix { socket_path } => UnixTransport::new(socket_path).start(server).await,
-        TransportType::Tcp { host, port } => TcpTransport::new(&host, port).start(server).await,
-        TransportType::Stdio => StdIoTransport.start(server).await,
+        TransportType::Unix { socket_path } => {
+            Server::new(UnixTransport::new(socket_path), codec)
+                .start(router)
+                .await
+        }
+        TransportType::Tcp { host, port } => {
+            Server::new(TcpTransport::new(&host, port), codec)
+                .start(router)
+                .await
+        }
+        TransportType::Stdio => Server::new(StdIoTransport, codec).start(router).await,
     }
 }

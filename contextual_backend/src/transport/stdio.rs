@@ -1,30 +1,40 @@
-use std::sync::Arc;
-
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncWrite, Stdin, Stdout};
 
 use crate::{
-    jsonrpc::JsonRpcServer,
-    transport::{Transport, handle_client},
+    jsonrpc::{JsonRpcRequest, JsonRpcResponse},
+    router::RouterFactory,
+    transport::{
+        Transport,
+        codec::{Codec, LengthDelimited},
+        handle_client,
+    },
 };
-
-use super::GenError;
 
 pub struct StdIoTransport;
 
 impl Transport for StdIoTransport {
-    async fn start(self, server: JsonRpcServer) -> Result<(), GenError> {
-        println!("Server listening on stdin/stdout");
-        let server = Arc::new(server);
-        let stream = CombinedStream::new(tokio::io::stdin(), tokio::io::stdout());
+    type Stream = CombinedStream<Stdin, Stdout>;
+    type Framer = LengthDelimited<Self::Stream>;
 
-        handle_client(stream, server).await?;
+    async fn start<C: Codec<JsonRpcRequest, JsonRpcResponse> + Send>(
+        self,
+        server: RouterFactory,
+        codec: C,
+    ) -> Result<(), anyhow::Error> {
+        use tokio::io::{stdin, stdout};
+
+        println!("Server listening on stdin/stdout");
+        let service = server.service();
+        let framer = Self::Framer::new(CombinedStream::new(stdin(), stdout()));
+
+        handle_client(framer, codec, service).await?;
 
         Ok(())
     }
 }
 
 /// Combined stream for stdin/stdout
-struct CombinedStream<R, W> {
+pub struct CombinedStream<R, W> {
     reader: R,
     writer: W,
 }
